@@ -1,8 +1,15 @@
 from lxml import html
-from lxml import etree
 import requests
 import difflib
 import sys
+import config
+import twitter
+import sched
+import time
+from datetime import datetime
+
+isSimulate = False
+loopTimeSec = 60 * 60 # 60 mins
 
 class Movie:
 
@@ -27,14 +34,14 @@ def fakeFromFile(fileName):
 
 def getNew():
 
-	tree = html.parse("page.html")
+	tree = None
 
-	if len(sys.argv) == 1:
-		print "release"
+	if isSimulate is True:
+		print "simulation"
+		tree = html.parse("page.html")
+	else:
 		page = requests.get('http://www.imdb.com/chart/top')
 		tree = html.fromstring(page.content)
-	else:
-		print "debug"
 
 	urls = tree.xpath('//*[@id="main"]/div/span/div/div/div[3]/table/tbody/tr[*]/td[@class="titleColumn"]/a')
 	titles = tree.xpath('//*[@id="main"]/div/span/div/div/div[3]/table/tbody/tr[*]/td[@class="titleColumn"]/a/text()')
@@ -47,69 +54,118 @@ def getNew():
 
 	return imdbTop250MoviesNew
 
-imdbTop250MoviesOld = fakeFromFile("testOld")
-# print getMovieList(imdbTop250MoviesOld)
-# print "**************************"
+def PostTweet(twitterApi, tweet):
+	# No tweet in debug mode
+	if isSimulate is True:
+		print "Simulate tweeting: " + tweet
+	else:
+		# TODO: Check tweet length
+		print "Real tweeting: " + tweet
+		twitterApi.PostUpdate(tweet)		
 
-imdbTop250MoviesNew = fakeFromFile("testNew") # getNew()
-# print getMovieList(imdbTop250MoviesNew)
-# print "**************************"
+def getOpt():
+	if len(sys.argv) > 1:
+		if sys.argv[1] == 'simulate':
+			global isSimulate
+			isSimulate = True
+			print "isSumlate " + str(isSimulate)
 
-d = difflib.Differ()
-diff = d.compare(getMovieList(imdbTop250MoviesOld).splitlines(1), getMovieList(imdbTop250MoviesNew).splitlines(1))
+			global loopTimeSec
+			loopTimeSec = 3 # 3 sec
+			print "loopTimeSec " + str(loopTimeSec)
 
-# print '\n'.join(diff) # Has side effet of clearing the diff list
-# print "**************************"
+def processLoop(imdbTop250MoviesOld, sc):
+	print str(datetime.now()) + ": processLoop"
 
-lineNumOld = 1
-lineNumNew = 1
-imdbTop250MoviesOldDiff = []
-imdbTop250MoviesNewDiff = []
+	if isSimulate is True:
+		imdbTop250MoviesNew = fakeFromFile("testNew")
+		# print getMovieList(imdbTop250MoviesNew)
+		# print "**************************"
+	else:
+		imdbTop250MoviesNew = getNew()
 
-for line in list(diff):
-	code = line[:2]
+	d = difflib.Differ()
+	diff = d.compare(getMovieList(imdbTop250MoviesOld).splitlines(1), getMovieList(imdbTop250MoviesNew).splitlines(1))
 
-	if code == "  ":
-		lineNumOld += 1
-		lineNumNew += 1
+	# print '\n'.join(diff) # Has side effet of clearing the diff list
+	# print "**************************"
 
-	if code == "- ":
-		imdbTop250MoviesOldDiff.append(lineNumOld - 1)
-		print "Old:\t%d: %s" % (lineNumOld, line[2:].strip())
-		lineNumOld += 1
+	lineNumOld = 1
+	lineNumNew = 1
+	imdbTop250MoviesOldDiff = []
+	imdbTop250MoviesNewDiff = []
 
-	if code == "+ ":
-		imdbTop250MoviesNewDiff.append(lineNumNew - 1)
-		print "New:\t%d: %s" % (lineNumNew, line[2:].strip())
-		lineNumNew += 1
+	for line in list(diff):
+		code = line[:2]
 
-	if code == "? ":
-		pass
+		if code == "  ":
+			lineNumOld += 1
+			lineNumNew += 1
 
-print imdbTop250MoviesOldDiff
-print "**************************"
-print imdbTop250MoviesNewDiff
+		if code == "- ":
+			imdbTop250MoviesOldDiff.append(lineNumOld - 1)
+			print "Old:\t%d: %s" % (lineNumOld, line[2:].strip())
+			lineNumOld += 1
 
-for indexOld in list(imdbTop250MoviesOldDiff): # list() -- required because elements are removed from the org list
-	movieName = imdbTop250MoviesOld[indexOld].movieName
+		if code == "+ ":
+			imdbTop250MoviesNewDiff.append(lineNumNew - 1)
+			print "New:\t%d: %s" % (lineNumNew, line[2:].strip())
+			lineNumNew += 1
 
-	for indexNew in list(imdbTop250MoviesNewDiff): # list() -- required because elements are removed from the org list
-		if imdbTop250MoviesNew[indexNew].movieName == movieName:
+		if code == "? ":
+			pass
 
-			# Movie rank increased
-			if indexOld < indexNew:
-				print "Movie '%s' slipped from rank %d to rank %d." % (movieName, indexOld + 1, indexNew + 1)
+	# print imdbTop250MoviesOldDiff
+	# print "**************************"
+	# print imdbTop250MoviesNewDiff
 
-			if indexOld > indexNew:
-				print "Movie '%s' jumped from rank %d to rank %d just ahead of %s" % (movieName, indexOld + 1, indexNew + 1, imdbTop250MoviesNew[indexNew + 1].movieName)
+	twitterApi = twitter.Api(config.consumer_key, config.consumer_secret, config.access_token, config.access_token_secret)
 
-			imdbTop250MoviesOldDiff.remove(indexOld)
-			imdbTop250MoviesNewDiff.remove(indexNew)
+	for indexOld in list(imdbTop250MoviesOldDiff): # list() -- required because elements are removed from the org list
+		movieName = imdbTop250MoviesOld[indexOld].movieName
 
-for indexOld in imdbTop250MoviesOldDiff:
-	movieName = imdbTop250MoviesOld[indexOld].movieName
-	print "Movie '%s' dropped from out of IMDb Top 250 from rank %d." % (movieName, indexOld + 1)
+		for indexNew in list(imdbTop250MoviesNewDiff): # list() -- required because elements are removed from the org list
+			if imdbTop250MoviesNew[indexNew].movieName == movieName:
 
-for indexNew in imdbTop250MoviesNewDiff:
-	movieName = imdbTop250MoviesNew[indexNew].movieName
-	print "Movie '%s' got added to IMDb Top 250 at rank %d just ahead of %s" % (movieName, indexNew + 1, imdbTop250MoviesNew[indexNew + 1].movieName)
+				# Movie rank increased
+				if indexOld < indexNew:
+					tweet = "Movie '%s' slipped from rank %d to rank %d." % (movieName, indexOld + 1, indexNew + 1)
+					PostTweet(twitterApi, tweet)
+
+				if indexOld > indexNew:
+					#  just ahead of %s -- imdbTop250MoviesNew[indexNew + 1].movieName -- add check of index range to be safe
+					tweet = "Movie '%s' jumped from rank %d to rank %d" % (movieName, indexOld + 1, indexNew + 1)
+					PostTweet(twitterApi, tweet)
+
+				imdbTop250MoviesOldDiff.remove(indexOld)
+				imdbTop250MoviesNewDiff.remove(indexNew)
+
+	for indexOld in imdbTop250MoviesOldDiff:
+		movieName = imdbTop250MoviesOld[indexOld].movieName
+		tweet = "Movie '%s' dropped from out of IMDb Top 250 from rank %d." % (movieName, indexOld + 1)
+		PostTweet(twitterApi, tweet)
+
+	for indexNew in imdbTop250MoviesNewDiff:
+		movieName = imdbTop250MoviesNew[indexNew].movieName
+		# just ahead of %s -- imdbTop250MoviesNew[indexNew + 1].movieName -- handle index out of range
+		tweet = "Movie '%s' got added to IMDb Top 250 at rank %d" % (movieName, indexNew + 1)
+		PostTweet(twitterApi, tweet)
+
+	sc.enter(loopTimeSec, 1, processLoop, (imdbTop250MoviesNew, sc,))
+
+def main():
+	getOpt()
+
+	if isSimulate is True:
+		imdbTop250MoviesOld = fakeFromFile("testOld")
+		# print getMovieList(imdbTop250MoviesOld)
+		# print "**************************"
+	else:
+		imdbTop250MoviesOld = getNew()
+
+	s = sched.scheduler(time.time, time.sleep)
+	s.enter(loopTimeSec, 1, processLoop, (imdbTop250MoviesOld, s,))
+	s.run()
+
+if __name__ == "__main__":
+    main()
