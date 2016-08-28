@@ -56,7 +56,7 @@ def getNew():
 
 def PostTweet(twitterApi, tweet, attempt):
 	# No tweet in debug mode
-	if isSimulate is False:
+	if isSimulate is True:
 		print "Simulate tweeting: " + tweet
 	else:
 		try:
