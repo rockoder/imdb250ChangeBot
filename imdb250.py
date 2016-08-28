@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 
 isSimulate = False
-loopTimeSec = 60 * 60 # 60 mins
+loopTimeSec = 15 * 60 # 60 mins
 
 class Movie:
 
@@ -54,25 +54,33 @@ def getNew():
 
 	return imdbTop250MoviesNew
 
-def PostTweet(twitterApi, tweet):
+def PostTweet(twitterApi, tweet, attempt):
 	# No tweet in debug mode
-	if isSimulate is True:
+	if isSimulate is False:
 		print "Simulate tweeting: " + tweet
 	else:
-		# TODO: Check tweet length
-		print "Real tweeting: " + tweet
-		twitterApi.PostUpdate(tweet)		
+		try:
+			# TODO: Check tweet length
+			print "Real tweeting: " + tweet
+			twitterApi.PostUpdate(tweet)
+		except Exception as e:
+			print "Error while tweeting: %s\n" % e
+			if attempt == 1:
+				tweet = tweet + " Time " + str(datetime.strftime(datetime.now(), '%H:%M:%S'))
+				print "Tweeting with time appended: %s" % tweet
+				PostTweet(twitterApi, tweet, 2)
 
 def getOpt():
 	if len(sys.argv) > 1:
 		if sys.argv[1] == 'simulate':
 			global isSimulate
 			isSimulate = True
-			print "isSumlate " + str(isSimulate)
-
+			
 			global loopTimeSec
 			loopTimeSec = 3 # 3 sec
-			print "loopTimeSec " + str(loopTimeSec)
+
+	print "isSumlate " + str(isSimulate)
+	print "loopTimeSec " + str(loopTimeSec)
 
 def processLoop(imdbTop250MoviesOld, sc):
 	print str(datetime.now()) + ": processLoop"
@@ -130,12 +138,12 @@ def processLoop(imdbTop250MoviesOld, sc):
 				# Movie rank increased
 				if indexOld < indexNew:
 					tweet = "Movie '%s' slipped from rank %d to rank %d." % (movieName, indexOld + 1, indexNew + 1)
-					PostTweet(twitterApi, tweet)
+					PostTweet(twitterApi, tweet, 1)
 
 				if indexOld > indexNew:
 					#  just ahead of %s -- imdbTop250MoviesNew[indexNew + 1].movieName -- add check of index range to be safe
-					tweet = "Movie '%s' jumped from rank %d to rank %d" % (movieName, indexOld + 1, indexNew + 1)
-					PostTweet(twitterApi, tweet)
+					tweet = "Movie '%s' jumped from rank %d to rank %d." % (movieName, indexOld + 1, indexNew + 1)
+					PostTweet(twitterApi, tweet, 1)
 
 				imdbTop250MoviesOldDiff.remove(indexOld)
 				imdbTop250MoviesNewDiff.remove(indexNew)
@@ -143,13 +151,13 @@ def processLoop(imdbTop250MoviesOld, sc):
 	for indexOld in imdbTop250MoviesOldDiff:
 		movieName = imdbTop250MoviesOld[indexOld].movieName
 		tweet = "Movie '%s' dropped from out of IMDb Top 250 from rank %d." % (movieName, indexOld + 1)
-		PostTweet(twitterApi, tweet)
+		PostTweet(twitterApi, tweet, 1)
 
 	for indexNew in imdbTop250MoviesNewDiff:
 		movieName = imdbTop250MoviesNew[indexNew].movieName
 		# just ahead of %s -- imdbTop250MoviesNew[indexNew + 1].movieName -- handle index out of range
-		tweet = "Movie '%s' got added to IMDb Top 250 at rank %d" % (movieName, indexNew + 1)
-		PostTweet(twitterApi, tweet)
+		tweet = "Movie '%s' got added to IMDb Top 250 at rank %d." % (movieName, indexNew + 1)
+		PostTweet(twitterApi, tweet, 1)
 
 	sc.enter(loopTimeSec, 1, processLoop, (imdbTop250MoviesNew, sc,))
 
