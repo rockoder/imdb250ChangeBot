@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 
 isSimulate = False
-loopTimeSec = 15 * 60 # 60 mins
+loopTimeSec = 15 * 60 # 15 mins
 fp = open('/var/tmp/imdb250.log', 'a')
 
 class Movie:
@@ -82,6 +82,7 @@ def getOpt():
 
 	print >>fp, "isSumlate " + str(isSimulate)
 	print >>fp, "loopTimeSec " + str(loopTimeSec)
+	fp.flush()
 
 def processLoop(imdbTop250MoviesOld, sc):
 	print >>fp, str(datetime.now()) + ": processLoop"
@@ -160,6 +161,8 @@ def processLoop(imdbTop250MoviesOld, sc):
 		tweet = "Movie '%s' got added to IMDb Top 250 at rank %d." % (movieName, indexNew + 1)
 		PostTweet(twitterApi, tweet, 1)
 
+	fp.flush()
+
 	sc.enter(loopTimeSec, 1, processLoop, (imdbTop250MoviesNew, sc,))
 
 def main():
@@ -175,6 +178,7 @@ def main():
 	s = sched.scheduler(time.time, time.sleep)
 	s.enter(loopTimeSec, 1, processLoop, (imdbTop250MoviesOld, s,))
 	s.run()
+	fp.close()
 
 if __name__ == "__main__":
     main()
