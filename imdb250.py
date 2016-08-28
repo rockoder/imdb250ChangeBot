@@ -10,6 +10,7 @@ from datetime import datetime
 
 isSimulate = False
 loopTimeSec = 15 * 60 # 60 mins
+fp = open('/var/tmp/imdb250.log', 'a')
 
 class Movie:
 
@@ -37,7 +38,7 @@ def getNew():
 	tree = None
 
 	if isSimulate is True:
-		print "simulation"
+		print >>fp, "simulation"
 		tree = html.parse("page.html")
 	else:
 		page = requests.get('http://www.imdb.com/chart/top')
@@ -57,17 +58,17 @@ def getNew():
 def PostTweet(twitterApi, tweet, attempt):
 	# No tweet in debug mode
 	if isSimulate is True:
-		print "Simulate tweeting: " + tweet
+		print >>fp, "Simulate tweeting: " + tweet
 	else:
 		try:
 			# TODO: Check tweet length
-			print "Real tweeting: " + tweet
+			print >>fp, "Real tweeting: " + tweet
 			twitterApi.PostUpdate(tweet)
 		except Exception as e:
-			print "Error while tweeting: %s\n" % e
+			print >>fp, "Error while tweeting: %s\n" % e
 			if attempt == 1:
 				tweet = tweet + " Time " + str(datetime.strftime(datetime.now(), '%H:%M:%S'))
-				print "Tweeting with time appended: %s" % tweet
+				print >>fp, "Tweeting with time appended: %s" % tweet
 				PostTweet(twitterApi, tweet, 2)
 
 def getOpt():
@@ -79,24 +80,24 @@ def getOpt():
 			global loopTimeSec
 			loopTimeSec = 3 # 3 sec
 
-	print "isSumlate " + str(isSimulate)
-	print "loopTimeSec " + str(loopTimeSec)
+	print >>fp, "isSumlate " + str(isSimulate)
+	print >>fp, "loopTimeSec " + str(loopTimeSec)
 
 def processLoop(imdbTop250MoviesOld, sc):
-	print str(datetime.now()) + ": processLoop"
+	print >>fp, str(datetime.now()) + ": processLoop"
 
 	if isSimulate is True:
 		imdbTop250MoviesNew = fakeFromFile("testNew")
-		# print getMovieList(imdbTop250MoviesNew)
-		# print "**************************"
+		# print >>fp, getMovieList(imdbTop250MoviesNew)
+		# print >>fp, "**************************"
 	else:
 		imdbTop250MoviesNew = getNew()
 
 	d = difflib.Differ()
 	diff = d.compare(getMovieList(imdbTop250MoviesOld).splitlines(1), getMovieList(imdbTop250MoviesNew).splitlines(1))
 
-	# print '\n'.join(diff) # Has side effet of clearing the diff list
-	# print "**************************"
+	# print >>fp, '\n'.join(diff) # Has side effet of clearing the diff list
+	# print >>fp, "**************************"
 
 	lineNumOld = 1
 	lineNumNew = 1
@@ -112,20 +113,20 @@ def processLoop(imdbTop250MoviesOld, sc):
 
 		if code == "- ":
 			imdbTop250MoviesOldDiff.append(lineNumOld - 1)
-			print "Old:\t%d: %s" % (lineNumOld, line[2:].strip())
+			print >>fp, "Old:\t%d: %s" % (lineNumOld, line[2:].strip())
 			lineNumOld += 1
 
 		if code == "+ ":
 			imdbTop250MoviesNewDiff.append(lineNumNew - 1)
-			print "New:\t%d: %s" % (lineNumNew, line[2:].strip())
+			print >>fp, "New:\t%d: %s" % (lineNumNew, line[2:].strip())
 			lineNumNew += 1
 
 		if code == "? ":
 			pass
 
-	# print imdbTop250MoviesOldDiff
-	# print "**************************"
-	# print imdbTop250MoviesNewDiff
+	# print >>fp, imdbTop250MoviesOldDiff
+	# print >>fp, "**************************"
+	# print >>fp, imdbTop250MoviesNewDiff
 
 	twitterApi = twitter.Api(config.consumer_key, config.consumer_secret, config.access_token, config.access_token_secret)
 
@@ -166,8 +167,8 @@ def main():
 
 	if isSimulate is True:
 		imdbTop250MoviesOld = fakeFromFile("testOld")
-		# print getMovieList(imdbTop250MoviesOld)
-		# print "**************************"
+		# print >>fp, getMovieList(imdbTop250MoviesOld)
+		# print >>fp, "**************************"
 	else:
 		imdbTop250MoviesOld = getNew()
 
