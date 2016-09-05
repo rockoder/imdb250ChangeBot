@@ -8,10 +8,12 @@ access_token_secret=''
 isSimulate = False
 
 # Time interval to check the change in imdb
-loopTimeSec = 15 * 60 # 15 mins
+loopTimeSec = 60 * 60 # 60 mins
 
 # Log file
 # need separate files for log file and tweet simulation file
 fp = open('imdb250.log', 'a')
 
 nTopMovies = 250
+
+tweetLength = 140

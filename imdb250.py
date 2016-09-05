@@ -4,6 +4,7 @@ import re
 import sched
 import time
 from datetime import datetime
+import string
 
 import difflib
 import twitter
@@ -16,6 +17,10 @@ def getMovieList(movieList):
     return "\n".join((str(movie) for movie in movieList))
 
 def postTweet(twitterApi, tweet, attempt):
+    if len(tweet) > config.tweetLength:
+        config.fp.write("Tweet length %s greater than %s:%s" % len(tweet), config.tweetLength, tweet)
+        return
+
     try:
         # TODO: Check tweet length
         twitterApi.PostUpdate(tweet)
@@ -55,45 +60,57 @@ def getDiffIndex(diff):
     return imdbTop250MoviesOldDiff, imdbTop250MoviesNewDiff
 
 def generateHashTag(movieName):
-    return "#" + "".join([x.strip() for x in re.split(';|,|\s+|#|-|:', movieName)])
+    tempMovieName = movieName
+    tempMovieName = tempMovieName.replace("'", "")
+    tempMovieName = tempMovieName.replace("\"", "")
+    # · Required for Wall·E
+    return "#" + "".join([string.capwords(x.strip()) for x in re.split(';|,|\s+|#|-|:|·', tempMovieName)])
 
 def generateTweet(imdbTop250MoviesOld, imdbTop250MoviesOldDiff, imdbTop250MoviesNew, imdbTop250MoviesNewDiff, twitterApi):
+    combinedTweets = ""
+    tweet = ""
+
     for indexOld in list(imdbTop250MoviesOldDiff): # list() -- required because elements are removed from the org list
         movieName = imdbTop250MoviesOld[indexOld].movieName
 
         for indexNew in list(imdbTop250MoviesNewDiff): # list() -- required because elements are removed from the org list
             if imdbTop250MoviesNew[indexNew].movieName == movieName:
 
-                # Movie rank increased
+                # Movie rank increased. Movie went down in the chart.
                 if indexOld < indexNew:
-                    tweet = "%s down from %d to %d. %s %s" % (movieName, indexOld + 1, indexNew + 1,
-                                                              generateHashTag(movieName),
-                                                              imdbTop250MoviesNew[indexNew].movieURL)
-                    postTweet(twitterApi, tweet, 1)
+                    tweet = "%s down from %d to %d. %s" % (movieName, indexOld + 1, indexNew + 1,
+                                                              generateHashTag(movieName))
 
+                # Movie rank decreased. Movie went up in the chart.
                 if indexOld > indexNew:
                     #  just ahead of %s -- imdbTop250MoviesNew[indexNew + 1].movieName -- add check of index range to be safe
-                    tweet = "%s up from %d to %d. %s %s" % (movieName, indexOld + 1, indexNew + 1,
-                                                            generateHashTag(movieName),
-                                                            imdbTop250MoviesNew[indexNew].movieURL)
-                    postTweet(twitterApi, tweet, 1)
+                    tweet = "%s up from %d to %d. %s" % (movieName, indexOld + 1, indexNew + 1,
+                                                            generateHashTag(movieName))
+
+                if len(combinedTweets + "\n" + tweet) <= config.tweetLength:
+                    combinedTweets += "\n" + tweet
+                else:
+                    postTweet(twitterApi, combinedTweets, 1)
+                    combinedTweets = ""
+                    tweet = ""
 
                 imdbTop250MoviesOldDiff.remove(indexOld)
                 imdbTop250MoviesNewDiff.remove(indexNew)
 
+    if (len(combinedTweets) > 0):
+        postTweet(twitterApi, combinedTweets, 1)
+
     for indexOld in imdbTop250MoviesOldDiff:
         movieName = imdbTop250MoviesOld[indexOld].movieName
-        tweet = "%s dropped from out of IMDb Top 250 from rank %d. %s %s" % (movieName, indexOld + 1,
-                                                                             generateHashTag(movieName),
-                                                                             imdbTop250MoviesOld[indexOld].movieURL)
+        tweet = "%s dropped from out of IMDb Top 250 from rank %d. %s" % (movieName, indexOld + 1,
+                                                                             generateHashTag(movieName))
         postTweet(twitterApi, tweet, 1)
 
     for indexNew in imdbTop250MoviesNewDiff:
         movieName = imdbTop250MoviesNew[indexNew].movieName
         # just ahead of %s -- imdbTop250MoviesNew[indexNew + 1].movieName -- handle index out of range
-        tweet = "%s got added to IMDb Top 250 at rank %d. %s %s" % (movieName, indexNew + 1,
-                                                                    generateHashTag(movieName),
-                                                                    imdbTop250MoviesNew[indexNew].movieURL)
+        tweet = "%s got added to IMDb Top 250 at rank %d. %s" % (movieName, indexNew + 1,
+                                                                    generateHashTag(movieName))
         postTweet(twitterApi, tweet, 1)
 
 def processLoop(imdbTop250MoviesOld, twitterApi, sc):
