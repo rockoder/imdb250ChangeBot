@@ -74,30 +74,29 @@ def generateTweet(imdbTop250MoviesOld, imdbTop250MoviesOldDiff, imdbTop250Movies
         movieName = imdbTop250MoviesOld[indexOld].movieName
 
         for indexNew in list(imdbTop250MoviesNewDiff): # list() -- required because elements are removed from the org list
-            if imdbTop250MoviesNew[indexNew].movieName == movieName:
+            if imdbTop250MoviesNew[indexNew].movieName == movieName and indexOld != indexNew:
 
-                # Movie rank increased. Movie went down in the chart.
-                if indexOld < indexNew:
+                if indexOld < indexNew: # Movie rank increased. Movie went down in the chart.
                     tweet = "%s down from %d to %d. %s" % (movieName, indexOld + 1, indexNew + 1,
                                                               generateHashTag(movieName))
-
-                # Movie rank decreased. Movie went up in the chart.
-                if indexOld > indexNew:
+                elif indexOld > indexNew: # Movie rank decreased. Movie went up in the chart.
                     #  just ahead of %s -- imdbTop250MoviesNew[indexNew + 1].movieName -- add check of index range to be safe
                     tweet = "%s up from %d to %d. %s" % (movieName, indexOld + 1, indexNew + 1,
                                                             generateHashTag(movieName))
 
-                if len(combinedTweets + "\n" + tweet) <= config.tweetLength:
-                    combinedTweets += "\n" + tweet
+                if len(combinedTweets + tweet + "\n") <= config.tweetLength:
+                    combinedTweets += tweet + "\n"
                 else:
+                    combinedTweets = combinedTweets[:-1]
                     postTweet(twitterApi, combinedTweets, 1)
-                    combinedTweets = ""
+                    combinedTweets = tweet + "\n"
                     tweet = ""
 
                 imdbTop250MoviesOldDiff.remove(indexOld)
                 imdbTop250MoviesNewDiff.remove(indexNew)
 
     if (len(combinedTweets) > 0):
+        combinedTweets = combinedTweets[:-1]
         postTweet(twitterApi, combinedTweets, 1)
 
     for indexOld in imdbTop250MoviesOldDiff:
