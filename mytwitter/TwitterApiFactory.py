@@ -8,4 +8,7 @@ class TwitterApiFactory:
         if config.isSimulate:
             return TwitterImpl.TwitterImpl(config.fp)
         else:
-            return twitter.Api(config.consumer_key, config.consumer_secret, config.access_token, config.access_token_secret)
+            return twitter.Api(config.consumer_key,
+                               config.consumer_secret,
+                               config.access_token,
+                               config.access_token_secret)

@@ -1,14 +1,16 @@
-import difflib
 import sys
-from config import config
-import twitter
+import os
+import re
 import sched
 import time
 from datetime import datetime
-from scraper import IMDB250Scraper
+
+import difflib
+import twitter
+
+from scraper.IMDB250Scraper import imdb250Scrape
 from mytwitter.TwitterApiFactory import TwitterApiFactory
-import os
-import re
+from config import config
 
 def getMovieList(movieList):
     return "\n".join((str(movie) for movie in movieList))
@@ -64,12 +66,16 @@ def generateTweet(imdbTop250MoviesOld, imdbTop250MoviesOldDiff, imdbTop250Movies
 
                 # Movie rank increased
                 if indexOld < indexNew:
-                    tweet = "%s down from %d to %d. %s %s" % (movieName, indexOld + 1, indexNew + 1, generateHashTag(movieName), imdbTop250MoviesNew[indexNew].movieURL)
+                    tweet = "%s down from %d to %d. %s %s" % (movieName, indexOld + 1, indexNew + 1,
+                                                              generateHashTag(movieName),
+                                                              imdbTop250MoviesNew[indexNew].movieURL)
                     postTweet(twitterApi, tweet, 1)
 
                 if indexOld > indexNew:
                     #  just ahead of %s -- imdbTop250MoviesNew[indexNew + 1].movieName -- add check of index range to be safe
-                    tweet = "%s up from %d to %d. %s %s" % (movieName, indexOld + 1, indexNew + 1, generateHashTag(movieName), imdbTop250MoviesNew[indexNew].movieURL)
+                    tweet = "%s up from %d to %d. %s %s" % (movieName, indexOld + 1, indexNew + 1,
+                                                            generateHashTag(movieName),
+                                                            imdbTop250MoviesNew[indexNew].movieURL)
                     postTweet(twitterApi, tweet, 1)
 
                 imdbTop250MoviesOldDiff.remove(indexOld)
@@ -77,29 +83,35 @@ def generateTweet(imdbTop250MoviesOld, imdbTop250MoviesOldDiff, imdbTop250Movies
 
     for indexOld in imdbTop250MoviesOldDiff:
         movieName = imdbTop250MoviesOld[indexOld].movieName
-        tweet = "%s dropped from out of IMDb Top 250 from rank %d. %s %s" % (movieName, indexOld + 1, generateHashTag(movieName), imdbTop250MoviesOld[indexOld].movieURL)
+        tweet = "%s dropped from out of IMDb Top 250 from rank %d. %s %s" % (movieName, indexOld + 1,
+                                                                             generateHashTag(movieName),
+                                                                             imdbTop250MoviesOld[indexOld].movieURL)
         postTweet(twitterApi, tweet, 1)
 
     for indexNew in imdbTop250MoviesNewDiff:
         movieName = imdbTop250MoviesNew[indexNew].movieName
         # just ahead of %s -- imdbTop250MoviesNew[indexNew + 1].movieName -- handle index out of range
-        tweet = "%s got added to IMDb Top 250 at rank %d. %s %s" % (movieName, indexNew + 1, generateHashTag(movieName), imdbTop250MoviesNew[indexNew].movieURL)
+        tweet = "%s got added to IMDb Top 250 at rank %d. %s %s" % (movieName, indexNew + 1,
+                                                                    generateHashTag(movieName),
+                                                                    imdbTop250MoviesNew[indexNew].movieURL)
         postTweet(twitterApi, tweet, 1)
 
 def processLoop(imdbTop250MoviesOld, twitterApi, sc):
     config.fp.write(str(datetime.now()) + ": processLoop" + "\n")
 
     if config.isSimulate is True:
-        imdbTop250MoviesNew = IMDB250Scraper.imdb250Scrape(config.isSimulate, config.nTopMovies, 'test' + os.sep + 'newpage.html')
+        imdbTop250MoviesNew = imdb250Scrape(config.isSimulate, config.nTopMovies, 'test' + os.sep + 'newpage.html')
     else:
-        imdbTop250MoviesNew = IMDB250Scraper.imdb250Scrape(config.isSimulate, config.nTopMovies, 'http://www.imdb.com/chart/top')
+        imdbTop250MoviesNew = imdb250Scrape(config.isSimulate, config.nTopMovies, 'http://www.imdb.com/chart/top')
 
     d = difflib.Differ()
-    diff = d.compare(getMovieList(imdbTop250MoviesOld).splitlines(1), getMovieList(imdbTop250MoviesNew).splitlines(1))
+    diff = d.compare(getMovieList(imdbTop250MoviesOld).splitlines(1),
+                     getMovieList(imdbTop250MoviesNew).splitlines(1))
 
     imdbTop250MoviesOldDiff, imdbTop250MoviesNewDiff = getDiffIndex(diff)
 
-    generateTweet(imdbTop250MoviesOld, imdbTop250MoviesOldDiff, imdbTop250MoviesNew, imdbTop250MoviesNewDiff, twitterApi)
+    generateTweet(imdbTop250MoviesOld, imdbTop250MoviesOldDiff,
+                  imdbTop250MoviesNew, imdbTop250MoviesNewDiff, twitterApi)
 
     config.fp.flush()
 
@@ -119,9 +131,9 @@ def main():
     getOpt()
 
     if config.isSimulate is True:
-        imdbTop250MoviesOld = IMDB250Scraper.imdb250Scrape(config.isSimulate, config.nTopMovies, 'test' + os.sep + 'oldpage.html')
+        imdbTop250MoviesOld = imdb250Scrape(config.isSimulate, config.nTopMovies, 'test' + os.sep + 'oldpage.html')
     else:
-        imdbTop250MoviesOld = IMDB250Scraper.imdb250Scrape(config.isSimulate, config.nTopMovies, 'http://www.imdb.com/chart/top')
+        imdbTop250MoviesOld = imdb250Scrape(config.isSimulate, config.nTopMovies, 'http://www.imdb.com/chart/top')
 
     twitterApi = TwitterApiFactory.getTwitterApi(config)
 
